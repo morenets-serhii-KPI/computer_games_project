@@ -7,10 +7,11 @@ shader = ExtResource("1_3dk36")
 shader_parameter/corner_radius = 0.2000000095
 
 [node name="Tile" type="Node2D" unique_id=1859091705]
-z_index = 1
+z_index = 100
 position = Vector2(4, 4)
 
 [node name="Cell" type="ColorRect" parent="." unique_id=2028499049]
+z_index = 100
 material = SubResource("ShaderMaterial_3dk36")
 offset_left = 20.0
 offset_top = 20.0

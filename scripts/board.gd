@@ -40,6 +40,7 @@ func _ready():
 	# ❗ контейнер не рухаємо глобально
 	pieces_container.position = Vector2(0, 0)
 
+	generate_board()
 	spawn_pieces()
 
 
@@ -129,3 +130,24 @@ func spawn_pieces():
 		piece.position = slot_center - center_offset
 
 		pieces_container.add_child(piece)
+
+
+const TileScene = preload("res://scenes/tile.tscn")
+
+const GRID_W = 8
+const GRID_H = 8
+const TILE_SIZE = 150
+
+
+func generate_board():
+	for y in range(GRID_H):
+		for x in range(GRID_W):
+			var tile = TileScene.instantiate()
+
+			# позиція в сітці
+			tile.position = Vector2(x * TILE_SIZE, y * TILE_SIZE)
+
+			# опціонально: щоб було видно поверх всього
+			tile.z_index = 1
+
+			add_child(tile)

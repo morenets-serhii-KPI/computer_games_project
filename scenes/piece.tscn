@@ -2,9 +2,17 @@
 
 [ext_resource type="Script" uid="uid://dpqcv0crvl2bw" path="res://scripts/piece.gd" id="1_gebih"]
 
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_gebih"]
+resource_local_to_scene = true
+size = Vector2(0, 0)
+
 [node name="Piece" type="Node2D" unique_id=1777924144]
-z_index = 100
 script = ExtResource("1_gebih")
+
+[node name="Area2D" type="Area2D" parent="." unique_id=1157060314]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D" unique_id=1880097814]
+shape = SubResource("RectangleShape2D_gebih")
 
 [node name="Blocks" type="Node2D" parent="." unique_id=419059739]
 z_index = 100
