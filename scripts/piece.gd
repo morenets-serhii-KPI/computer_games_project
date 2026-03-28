@@ -7,79 +7,70 @@ var block_scene = preload("res://scenes/piece_block.tscn")
 
 @onready var collision = $Area2D/CollisionShape2D
 
-# тимчасове збереження shape, якщо setup викликали до ready
+static var current_dragged = null
+
+var dragging = false
+var drag_offset = Vector2.ZERO
+
+var start_position = Vector2.ZERO
+var start_scale = Vector2.ONE
+var start_z_index = 0
+
 var pending_shape = null
 
+var board_container = null
+var board = null
+var game_container = null
 
-static var current_dragged = null
-var start_position = Vector2.ZERO
 
+# ================== INIT ==================
 
 func _ready():
-
-	print($Area2D)
-	print($Area2D.input_pickable)
-	print($Area2D.monitoring)
-
 	start_position = global_position
-
-	# підключаємо input від Area2D
+	start_scale = scale
+	start_z_index = z_index
 
 	if pending_shape != null:
 		_apply_shape(pending_shape)
 
 
+# ================== SETUP ==================
+
 func setup(shape):
-	# якщо нода ще не готова — відкладаємо
 	if not is_node_ready():
 		pending_shape = shape
 	else:
 		_apply_shape(shape)
 
 
+# ================== SHAPE ==================
+
 func _apply_shape(shape):
 	form = shape
+	_clear_blocks()
+	_create_blocks()
+	_update_collision()
 
-	clear_blocks()
-	create_blocks()
-	update_collision()
 
-
-func clear_blocks():
-	if not has_node("Blocks"):
-		return
-
+func _clear_blocks():
 	for child in $Blocks.get_children():
 		child.queue_free()
 
 
-func create_blocks():
-	if not has_node("Blocks"):
-		return
-
+func _create_blocks():
 	for y in range(form.size()):
 		for x in range(form[y].size()):
 			if form[y][x] == 1:
 				var block = block_scene.instantiate()
-
-				block.position = Vector2(
-					x * TILE_SIZE,
-					y * TILE_SIZE
-				)
-
+				block.position = Vector2(x, y) * TILE_SIZE
 				$Blocks.add_child(block)
 
 
-func get_width_in_tiles():
-	var max_width = 0
-	for row in form:
-		max_width = max(max_width, row.size())
-	return max_width
+# ================== COLLISION ==================
 
+func _update_collision():
 
-func update_collision():
 	if collision == null or collision.shape == null:
-		print("❌ collision not ready")
 		return
 
 	var min_x = INF
@@ -89,55 +80,136 @@ func update_collision():
 
 	for block in $Blocks.get_children():
 		var pos = block.position
-
 		min_x = min(min_x, pos.x)
 		min_y = min(min_y, pos.y)
 		max_x = max(max_x, pos.x)
 		max_y = max(max_y, pos.y)
 
-	# розмір фігури
-	var width = max_x - min_x + TILE_SIZE
-	var height = max_y - min_y + TILE_SIZE
+	var size = Vector2(
+		max_x - min_x + TILE_SIZE,
+		max_y - min_y + TILE_SIZE
+	)
 
-	# padding (10-20%)
 	var padding = TILE_SIZE * 0.5
 
-	var size = Vector2(
-		width + padding,
-		height + padding
-	)
-
-	collision.shape.size = size
-
-	# центр по реальній фігурі
+	collision.shape.size = size + Vector2(padding, padding)
 	collision.position = Vector2(
-		min_x + width / 2,
-		min_y + height / 2
+		min_x + size.x / 2,
+		min_y + size.y / 2
 	)
 
 
-
-var dragging = false
-var drag_offset = Vector2.ZERO
+# ================== INPUT ==================
 
 func _input(event):
 
-	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+	if not (event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT):
+		return
 
-		if event.pressed:
+	if event.pressed:
+		_try_start_drag()
+	else:
+		_try_end_drag()
 
-			if current_dragged == null and is_mouse_over():
-				current_dragged = self
-				dragging = true
-				drag_offset = global_position - get_global_mouse_position()
 
-		else:
-			if dragging and current_dragged == self:
-				dragging = false
-				current_dragged = null
+func _try_start_drag():
 
-				global_position = start_position
+	if current_dragged != null or not is_mouse_over():
+		return
 
+	Input.set_mouse_mode(Input.MOUSE_MODE_HIDDEN)
+
+	current_dragged = self
+	dragging = true
+
+	drag_offset = global_position - get_global_mouse_position()
+
+	scale = Vector2.ONE * board_container.scale.x
+	z_index = 100
+
+
+func _try_end_drag():
+
+	if not (dragging and current_dragged == self):
+		return
+
+	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+
+	dragging = false
+	current_dragged = null
+
+	var grid = _get_grid_from_mouse()
+
+	if grid != null and board.can_place(form, grid.x, grid.y):
+		_place(grid)
+	else:
+		_reset_piece()
+
+	board.clear_highlight()
+
+
+# ================== LOGIC ==================
+
+func _place(grid):
+
+	board.place_piece(form, grid.x, grid.y)
+	board.update_tiles()
+	board.clear_highlight()
+
+	board.on_piece_placed(self)
+
+
+func _reset_piece():
+
+	global_position = start_position
+	scale = start_scale
+	z_index = start_z_index
+
+
+# ================== PROCESS ==================
+
+func _process(delta):
+
+	if not (dragging and current_dragged == self):
+		return
+
+	var mouse = get_global_mouse_position()
+
+	_update_highlight(mouse)
+	_update_position(mouse)
+
+
+# ================== HELPERS ==================
+
+func _update_position(mouse):
+	global_position = mouse + drag_offset
+
+
+func _update_highlight(mouse):
+
+	if board == null:
+		return
+
+	var grid = _get_grid_from_mouse(mouse)
+
+	if grid != null:
+		board.show_highlight(form, grid.x, grid.y)
+
+
+func _get_grid_from_mouse(mouse = get_global_mouse_position()):
+
+	if board == null:
+		return null
+
+	var local = board.to_local(mouse)
+
+	return Vector2(
+		int(local.x / TILE_SIZE),
+		int(local.y / TILE_SIZE)
+	)
+
+
+# ================== MOUSE ==================
 
 func is_mouse_over():
 
@@ -145,35 +217,12 @@ func is_mouse_over():
 		return false
 
 	var mouse_global = get_global_mouse_position()
-
-	# переводимо мишку в локальні координати collision
 	var mouse_local = collision.to_local(mouse_global)
 
-	# перевірка для RectangleShape2D
 	var rect = collision.shape as RectangleShape2D
+
 	if rect:
-		var half_size = rect.size / 2
-		return Rect2(-half_size, rect.size).has_point(mouse_local)
+		var half = rect.size / 2
+		return Rect2(-half, rect.size).has_point(mouse_local)
 
 	return false
-
-func _process(delta):
-
-	if dragging and current_dragged == self:
-		global_position = get_global_mouse_position() + drag_offset
-		
-	queue_redraw()
-
-func _draw():
-
-	if collision == null or collision.shape == null:
-		return
-
-	var size = collision.shape.size
-	var center = collision.position
-
-	draw_rect(
-		Rect2(center - size / 2, size),
-		Color(1, 0, 0, 0.3),  # червоний прозорий
-		true
-	)
