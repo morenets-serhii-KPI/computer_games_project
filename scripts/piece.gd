@@ -107,12 +107,12 @@ func _input(event):
 		return
 
 	if event.pressed:
-		_try_start_drag()
+		_start_drag()
 	else:
-		_try_end_drag()
+		_end_drag()
 
 
-func _try_start_drag():
+func _start_drag():
 
 	if current_dragged != null or not is_mouse_over():
 		return
@@ -128,7 +128,7 @@ func _try_start_drag():
 	z_index = 100
 
 
-func _try_end_drag():
+func _end_drag():
 
 	if not (dragging and current_dragged == self):
 		return
@@ -138,32 +138,37 @@ func _try_end_drag():
 	dragging = false
 	current_dragged = null
 
-	var grid = _get_grid_from_mouse()
-
-	if grid != null and board.can_place(form, grid.x, grid.y):
-		_place(grid)
+	if board.locked_highlight_pos != null:
+		_place()
 	else:
-		_reset_piece()
-
-	board.clear_highlight()
+		_reset()
 
 
 # ================== LOGIC ==================
 
-func _place(grid):
+func _place():
+
+	var grid = board.locked_highlight_pos
+
+	if grid == null:
+		_reset()
+		return
 
 	board.place_piece(form, grid.x, grid.y)
 	board.update_tiles()
-	board.clear_highlight()
 
 	board.on_piece_placed(self)
+	board.clear_highlight()
 
 
-func _reset_piece():
+func _reset():
 
 	global_position = start_position
 	scale = start_scale
 	z_index = start_z_index
+
+	if board != null:
+		board.clear_highlight()
 
 
 # ================== PROCESS ==================
@@ -176,14 +181,10 @@ func _process(delta):
 	var mouse = get_global_mouse_position()
 
 	_update_highlight(mouse)
-	_update_position(mouse)
+	global_position = mouse + drag_offset
 
 
 # ================== HELPERS ==================
-
-func _update_position(mouse):
-	global_position = mouse + drag_offset
-
 
 func _update_highlight(mouse):
 
@@ -191,15 +192,18 @@ func _update_highlight(mouse):
 		return
 
 	var grid = _get_grid_from_mouse(mouse)
+	if grid == null:
+		return
 
-	if grid != null:
-		board.show_highlight(form, grid.x, grid.y)
+	var best = board.find_best_position(form, grid.x, grid.y)
+
+	if best != null and abs(best.x - grid.x) + abs(best.y - grid.y) <= 2:
+		board.show_highlight(form, best.x, best.y)
+	else:
+		board.clear_highlight()
 
 
-func _get_grid_from_mouse(mouse = get_global_mouse_position()):
-
-	if board == null:
-		return null
+func _get_grid_from_mouse(mouse):
 
 	var local = board.to_local(mouse)
 
@@ -216,13 +220,11 @@ func is_mouse_over():
 	if collision == null or collision.shape == null:
 		return false
 
-	var mouse_global = get_global_mouse_position()
-	var mouse_local = collision.to_local(mouse_global)
+	var mouse_local = collision.to_local(get_global_mouse_position())
 
 	var rect = collision.shape as RectangleShape2D
 
 	if rect:
-		var half = rect.size / 2
-		return Rect2(-half, rect.size).has_point(mouse_local)
+		return Rect2(-rect.size / 2, rect.size).has_point(mouse_local)
 
 	return false

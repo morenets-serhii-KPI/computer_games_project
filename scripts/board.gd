@@ -18,6 +18,11 @@ const BOARD_SCALE = 0.5
 var grid = []
 var highlights = []
 
+var current_highlight_pos = null
+var locked_highlight_pos = null
+
+var cell_offset = Vector2(TILE_SIZE, TILE_SIZE) * 0.12
+
 # ================== INIT ==================
 
 func _ready():
@@ -38,14 +43,9 @@ func _setup_layout():
 	) * BOARD_SCALE
 
 	board_container.scale = Vector2(scale_factor, scale_factor)
-
 	pieces_container.scale = Vector2.ONE
 
-	board_container.position = Vector2(
-		screen.x * 0.02,
-		screen.y * 0.1
-	)
-
+	board_container.position = Vector2(screen.x * 0.02, screen.y * 0.1)
 	pieces_container.position = Vector2.ZERO
 
 
@@ -78,12 +78,11 @@ func _spawn_pieces():
 
 	_clear_pieces()
 
-	var shapes = _generate_shapes(3)
-
 	var layout = _calculate_piece_layout()
 
 	for i in range(3):
-		_create_piece(shapes[i], i, layout)
+		var shape = Shapes.FORMS.pick_random().pick_random()
+		_create_piece(shape, i, layout)
 
 	await get_tree().process_frame
 
@@ -96,17 +95,6 @@ func _clear_pieces():
 		c.queue_free()
 
 
-func _generate_shapes(count):
-
-	var result = []
-
-	for i in range(count):
-		var group = Shapes.FORMS.pick_random()
-		result.append(group.pick_random())
-
-	return result
-
-
 func _calculate_piece_layout():
 
 	var panel_w = right_panel.size.x
@@ -114,15 +102,12 @@ func _calculate_piece_layout():
 
 	var margin_x = panel_w * 0.08
 	var usable_width = panel_w - margin_x * 2
-
 	var spacing = panel_w * 0.02
 
 	var scale = (usable_width - spacing * 2) / (3 * 5 * TILE_SIZE)
 
 	var max_height = panel_h * 0.25
-	var scale_h = max_height / (5 * TILE_SIZE)
-
-	scale = min(scale, scale_h)
+	scale = min(scale, max_height / (5 * TILE_SIZE))
 
 	return {
 		"scale": scale,
@@ -183,16 +168,17 @@ func can_place(shape, grid_x, grid_y):
 	for y in range(shape.size()):
 		for x in range(shape[y].size()):
 
-			if shape[y][x] == 1:
+			if shape[y][x] != 1:
+				continue
 
-				var bx = grid_x + x
-				var by = grid_y + y
+			var bx = grid_x + x
+			var by = grid_y + y
 
-				if bx < 0 or by < 0 or bx >= GRID_W or by >= GRID_H:
-					return false
+			if bx < 0 or by < 0 or bx >= GRID_W or by >= GRID_H:
+				return false
 
-				if grid[by][bx] == 1:
-					return false
+			if grid[by][bx] == 1:
+				return false
 
 	return true
 
@@ -221,31 +207,24 @@ func update_tiles():
 func on_piece_placed(piece):
 
 	piece.queue_free()
-	
+
 	clear_lines()
 	update_tiles()
 
 	await get_tree().process_frame
 
-	if pieces_container.get_child_count() > 0:
-
-		if _is_game_over():
-			print("GAME OVER")
-			return
-
 	if pieces_container.get_child_count() == 0:
 		_spawn_pieces()
+	elif _is_game_over():
+		print("GAME OVER")
 
 
 func _is_game_over():
 
 	for piece in pieces_container.get_children():
-
-		var shape = piece.form
-
 		for y in range(GRID_H):
 			for x in range(GRID_W):
-				if can_place(shape, x, y):
+				if can_place(piece.form, x, y):
 					return false
 
 	return true
@@ -257,7 +236,13 @@ func show_highlight(shape, grid_x, grid_y):
 
 	clear_highlight()
 
-	var cell_offset = Vector2(12, 12)      # вирівнювання в клітинці
+	if not can_place(shape, grid_x, grid_y):
+		return
+
+	var pos = Vector2(grid_x, grid_y)
+
+	current_highlight_pos = pos
+	locked_highlight_pos = pos
 
 	for y in range(shape.size()):
 		for x in range(shape[y].size()):
@@ -268,12 +253,8 @@ func show_highlight(shape, grid_x, grid_y):
 			var bx = grid_x + x
 			var by = grid_y + y
 
-			if bx < 0 or by < 0 or bx >= GRID_W or by >= GRID_H:
-				continue
-
 			var block = HighlightBlock.instantiate()
-
-			block.position = Vector2(bx, by) * TILE_SIZE + cell_offset 
+			block.position = Vector2(bx, by) * TILE_SIZE + cell_offset
 			block.modulate = Color(1, 1, 1, 0.35)
 
 			add_child(block)
@@ -287,37 +268,21 @@ func clear_highlight():
 
 	highlights.clear()
 
-
-# ================== UTILS ==================
-
-func is_inside(mouse_global):
-
-	var local = to_local(mouse_global)
-
-	return (
-		local.x >= 0 and local.y >= 0 and
-		local.x < GRID_W * TILE_SIZE and
-		local.y < GRID_H * TILE_SIZE
-	)
+	current_highlight_pos = null
+	locked_highlight_pos = null 
 
 
+# ================== LINES ==================
 
 func clear_lines():
 
-	var rows_to_clear = []
-	var cols_to_clear = []
+	var rows = []
+	var cols = []
 
-	# --- перевірка рядків ---
 	for y in range(GRID_H):
-		var full = true
-		for x in range(GRID_W):
-			if grid[y][x] == 0:
-				full = false
-				break
-		if full:
-			rows_to_clear.append(y)
+		if grid[y].all(func(v): return v == 1):
+			rows.append(y)
 
-	# --- перевірка колонок ---
 	for x in range(GRID_W):
 		var full = true
 		for y in range(GRID_H):
@@ -325,13 +290,74 @@ func clear_lines():
 				full = false
 				break
 		if full:
-			cols_to_clear.append(x)
+			cols.append(x)
 
-	# --- очищення ---
-	for y in rows_to_clear:
+	for y in rows:
 		for x in range(GRID_W):
 			grid[y][x] = 0
 
-	for x in cols_to_clear:
+	for x in cols:
 		for y in range(GRID_H):
 			grid[y][x] = 0
+
+
+# ================== SMART SNAP ==================
+
+func find_best_position(shape, gx, gy):
+
+	gx = clamp(gx, 0, GRID_W - 1)
+	gy = clamp(gy, 0, GRID_H - 1)
+
+	var best_pos = null
+	var best_score = -INF
+
+	for r in range(5):
+		for dy in range(-r, r + 1):
+			for dx in range(-r, r + 1):
+
+				var nx = gx + dx
+				var ny = gy + dy
+
+				if not can_place(shape, nx, ny):
+					continue
+
+				var score = _score_position(shape, nx, ny, gx, gy)
+				score -= (abs(dx) + abs(dy)) * 0.1
+
+				if score > best_score:
+					best_score = score
+					best_pos = Vector2(nx, ny)
+
+	return best_pos
+
+
+func _score_position(shape, gx, gy, base_gx, base_gy):
+
+	var score = 0
+	var overlap = 0
+
+	for y in range(shape.size()):
+		for x in range(shape[y].size()):
+
+			if shape[y][x] != 1:
+				continue
+
+			var bx = gx + x
+			var by = gy + y
+
+			if bx == base_gx + x and by == base_gy + y:
+				overlap += 1
+
+			for n in [Vector2(1,0), Vector2(-1,0), Vector2(0,1), Vector2(0,-1)]:
+
+				var nx = bx + n.x
+				var ny = by + n.y
+
+				if nx >= 0 and ny >= 0 and nx < GRID_W and ny < GRID_H:
+					if grid[ny][nx] == 1:
+						score += 3
+
+	score += overlap * 20
+	score -= (abs(gx - base_gx) + abs(gy - base_gy)) * 0.2
+
+	return score
