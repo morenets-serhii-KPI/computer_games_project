@@ -6,6 +6,7 @@ const TILE_SIZE = 150
 var block_scene = preload("res://scenes/piece_block.tscn")
 
 @onready var collision = $Area2D/CollisionShape2D
+@onready var game_over_ui = get_node("/root/Main/GameOverUI")
 
 static var current_dragged = null
 
@@ -28,6 +29,7 @@ var shape_center_offset = Vector2.ZERO
 # ================== INIT ==================
 
 func _ready():
+	
 	start_position = global_position
 	start_scale = scale
 	start_z_index = z_index
@@ -104,7 +106,7 @@ func _update_collision():
 # ================== INPUT ==================
 
 func _input(event):
-
+	
 	if not (event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT):
 		return
 

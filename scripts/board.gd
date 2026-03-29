@@ -35,10 +35,8 @@ const SAVE_PATH = "user://save.dat"
 
 func _ready():
 	
-	
-	
 	await get_tree().process_frame
-			
+		
 	_load_score()
 	
 	score_ui.set_score(0)
@@ -47,11 +45,14 @@ func _ready():
 	_setup_layout()
 	_generate_board()
 	_spawn_pieces()
+	
 
-
+	
 # ================== LAYOUT ==================
 
 func _setup_layout():
+	
+	get_tree().paused = false
 
 	var screen = get_viewport_rect().size
 
@@ -246,6 +247,8 @@ func on_piece_placed(piece):
 		_spawn_pieces()
 	elif _is_game_over():
 		game_over_ui.show_game_over()
+		get_tree().paused = true
+		
 
 
 func _is_game_over():
@@ -609,4 +612,5 @@ func _save_score():
 		file.store_var(best_score)
 
 func _on_replay_btn_pressed() -> void:
+	get_tree().set_meta("replay", true)
 	get_tree().reload_current_scene()
