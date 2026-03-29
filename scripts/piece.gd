@@ -22,6 +22,8 @@ var board_container = null
 var board = null
 var game_container = null
 
+var shape_center_offset = Vector2.ZERO
+
 
 # ================== INIT ==================
 
@@ -203,9 +205,12 @@ func _update_highlight(mouse):
 		board.clear_highlight()
 
 
-func _get_grid_from_mouse(mouse):
+func _get_grid_from_mouse(mouse = get_global_mouse_position()):
 
-	var local = board.to_local(mouse)
+	if board == null:
+		return null
+
+	var local = board.to_local(global_position)
 
 	return Vector2(
 		int(local.x / TILE_SIZE),
@@ -228,3 +233,42 @@ func is_mouse_over():
 		return Rect2(-rect.size / 2, rect.size).has_point(mouse_local)
 
 	return false
+
+
+func _get_shape_center_offset():
+
+	var min_x = INF
+	var max_x = -INF
+	var min_y = INF
+	var max_y = -INF
+
+	for y in range(form.size()):
+		for x in range(form[y].size()):
+			if form[y][x] == 1:
+				min_x = min(min_x, x)
+				max_x = max(max_x, x)
+				min_y = min(min_y, y)
+				max_y = max(max_y, y)
+
+	var center = Vector2(
+		(min_x + max_x + 1) / 2.0,
+		(min_y + max_y + 1) / 2.0
+	)
+
+	return center * TILE_SIZE * scale
+
+
+func _try_start_drag():
+
+	if current_dragged != null or not is_mouse_over():
+		return
+
+	Input.set_mouse_mode(Input.MOUSE_MODE_HIDDEN)
+
+	current_dragged = self
+	dragging = true
+
+	shape_center_offset = _get_shape_center_offset()
+
+	scale = Vector2.ONE * board_container.scale.x
+	z_index = 100
