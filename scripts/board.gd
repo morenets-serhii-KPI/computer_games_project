@@ -14,6 +14,8 @@ const BOARD_SCALE = 0.5
 @onready var board_container = $".."
 @onready var pieces_container = $"../../RightPanel/PiecesContainer"
 @onready var right_panel = $"../../RightPanel"
+@onready var score_ui = $"../../RightPanel/UI/ScorePanel"
+@onready var game_over_ui = $"../../../GameOverUI"
 
 var grid = []
 var highlights = []
@@ -23,9 +25,25 @@ var locked_highlight_pos = null
 
 var cell_offset = Vector2(TILE_SIZE, TILE_SIZE) * 0.12
 
+var score = 0
+var combo = 0
+
+var best_score = 0
+const SAVE_PATH = "user://save.dat"
+
 # ================== INIT ==================
 
 func _ready():
+	
+	
+	
+	await get_tree().process_frame
+			
+	_load_score()
+	
+	score_ui.set_score(0)
+	score_ui.set_best(best_score, false)
+	
 	_setup_layout()
 	_generate_board()
 	_spawn_pieces()
@@ -88,7 +106,7 @@ func _spawn_pieces():
 	await get_tree().process_frame
 
 	if _is_game_over():
-		print("GAME OVER")
+		get_node("/root/Main/GameOverUI").show_game_over()
 
 
 func _clear_pieces():
@@ -207,9 +225,19 @@ func update_tiles():
 
 func on_piece_placed(piece):
 
+	var block_count = _count_blocks(piece.form)
+	add_score(block_count * 10)
+
 	piece.queue_free()
 
-	clear_lines()
+	var cleared = clear_lines()  # 🔥 тепер повертає кількість
+
+	if cleared > 0:
+		_handle_clear_score(cleared)
+		combo += 1
+	else:
+		combo = 0
+
 	update_tiles()
 
 	await get_tree().process_frame
@@ -217,7 +245,7 @@ func on_piece_placed(piece):
 	if pieces_container.get_child_count() == 0:
 		_spawn_pieces()
 	elif _is_game_over():
-		print("GAME OVER")
+		game_over_ui.show_game_over()
 
 
 func _is_game_over():
@@ -293,6 +321,8 @@ func clear_lines():
 		if full:
 			cols.append(x)
 
+	var total = rows.size() + cols.size()
+
 	for y in rows:
 		for x in range(GRID_W):
 			grid[y][x] = 0
@@ -300,6 +330,8 @@ func clear_lines():
 	for x in cols:
 		for y in range(GRID_H):
 			grid[y][x] = 0
+
+	return total
 
 
 # ================== SMART SNAP ==================
@@ -502,3 +534,79 @@ func _copy_grid(src):
 		result.append(row.duplicate())
 
 	return result
+
+
+# =============== SCORE SYSTEM ==================
+
+func add_score(amount):
+
+	score += amount
+
+	score_ui.set_score(score)
+
+	if score > best_score:
+		best_score = score
+		score_ui.set_best(best_score, true)
+		_save_score()
+
+
+func _handle_clear_score(lines):
+
+	var base = 0
+
+	match lines:
+		1: base = 100
+		2: base = 250
+		3: base = 400
+		_:
+			base = 600 + (lines - 4) * 150
+
+	# комбо бонус
+	var combo_bonus = 0
+
+	if combo >= 1:
+		match combo:
+			1: combo_bonus = 0
+			2: combo_bonus = 50
+			3: combo_bonus = 150
+			_:
+				combo_bonus = 300 + (combo - 3) * 100
+
+	add_score(base + combo_bonus)
+
+
+func _count_blocks(shape):
+
+	var count = 0
+
+	for y in range(shape.size()):
+		for x in range(shape[y].size()):
+			if shape[y][x] == 1:
+				count += 1
+
+	return count
+
+
+func _load_score():
+
+	if not FileAccess.file_exists(SAVE_PATH):
+		best_score = 0
+		return
+
+	var file = FileAccess.open(SAVE_PATH, FileAccess.READ)
+
+	if file:
+		best_score = file.get_var()
+	else:
+		best_score = 0
+
+
+func _save_score():
+
+	var file = FileAccess.open(SAVE_PATH, FileAccess.WRITE)
+
+	if file:
+		file.store_var(best_score)
+
+func _on_replay_btn_pressed() -> void:
+	get_tree().reload_current_scene()

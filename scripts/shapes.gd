@@ -1,7 +1,7 @@
 extends Node
 
 const FORMS = [
-
+	
 [[[1,1],[1,1]]], # shape 1 - 2x2 square
 
 [[[1,1,1],[1,1,1]],
