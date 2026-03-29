@@ -124,11 +124,10 @@ func _start_drag():
 	current_dragged = self
 	dragging = true
 
-	drag_offset = global_position - get_global_mouse_position()
+	shape_center_offset = _get_shape_center_offset()
 
 	scale = Vector2.ONE * board_container.scale.x
 	z_index = 100
-
 
 func _end_drag():
 
@@ -183,7 +182,7 @@ func _process(delta):
 	var mouse = get_global_mouse_position()
 
 	_update_highlight(mouse)
-	global_position = mouse + drag_offset
+	global_position = mouse #- shape_center_offset
 
 
 # ================== HELPERS ==================

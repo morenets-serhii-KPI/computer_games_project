@@ -80,9 +80,10 @@ func _spawn_pieces():
 
 	var layout = _calculate_piece_layout()
 
+	var shapes = generate_playable_shapes()
+
 	for i in range(3):
-		var shape = Shapes.FORMS.pick_random().pick_random()
-		_create_piece(shape, i, layout)
+		_create_piece(shapes[i], i, layout)
 
 	await get_tree().process_frame
 
@@ -361,3 +362,143 @@ func _score_position(shape, gx, gy, base_gx, base_gy):
 	score -= (abs(gx - base_gx) + abs(gy - base_gy)) * 0.2
 
 	return score
+
+
+# =============== PIECES GENERATOR ==================
+
+func generate_playable_shapes():
+
+	var attempts = 20
+	var fallback_shapes = []  # 🔥 ДОДАЛИ
+
+	for i in range(attempts):
+
+		var shapes = []
+
+		for j in range(3):
+			var group = Shapes.FORMS.pick_random()
+			shapes.append(group.pick_random())
+
+		fallback_shapes = shapes  # 🔥 зберігаємо останній варіант
+
+		if _is_shapes_playable(shapes):
+			return shapes
+
+	# fallback
+	return fallback_shapes  # 🔥 ТЕПЕР НЕ ПАДАЄ
+
+func _is_shapes_playable(shapes):
+
+	var permutations = [
+		[0,1,2],
+		[0,2,1],
+		[1,0,2],
+		[1,2,0],
+		[2,0,1],
+		[2,1,0]
+	]
+
+	for order in permutations:
+
+		var test_grid = _copy_grid(grid)
+
+		var success = true
+
+		for i in order:
+
+			var shape = shapes[i]
+
+			var placed = _try_place_anywhere(test_grid, shape)
+
+			if not placed:
+				success = false
+				break
+
+			_clear_lines_sim(test_grid)
+
+		if success:
+			return true
+
+	return false
+
+
+func _try_place_anywhere(test_grid, shape):
+
+	for y in range(GRID_H):
+		for x in range(GRID_W):
+
+			if _can_place_sim(test_grid, shape, x, y):
+				_place_sim(test_grid, shape, x, y)
+				return true
+
+	return false
+
+
+func _can_place_sim(test_grid, shape, gx, gy):
+
+	for y in range(shape.size()):
+		for x in range(shape[y].size()):
+
+			if shape[y][x] == 1:
+
+				var bx = gx + x
+				var by = gy + y
+
+				if bx < 0 or by < 0 or bx >= GRID_W or by >= GRID_H:
+					return false
+
+				if test_grid[by][bx] == 1:
+					return false
+
+	return true
+
+
+func _place_sim(test_grid, shape, gx, gy):
+
+	for y in range(shape.size()):
+		for x in range(shape[y].size()):
+
+			if shape[y][x] == 1:
+				test_grid[gy + y][gx + x] = 1
+
+
+func _clear_lines_sim(test_grid):
+
+	var rows = []
+	var cols = []
+
+	for y in range(GRID_H):
+		var full = true
+		for x in range(GRID_W):
+			if test_grid[y][x] == 0:
+				full = false
+				break
+		if full:
+			rows.append(y)
+
+	for x in range(GRID_W):
+		var full = true
+		for y in range(GRID_H):
+			if test_grid[y][x] == 0:
+				full = false
+				break
+		if full:
+			cols.append(x)
+
+	for y in rows:
+		for x in range(GRID_W):
+			test_grid[y][x] = 0
+
+	for x in cols:
+		for y in range(GRID_H):
+			test_grid[y][x] = 0
+
+
+func _copy_grid(src):
+
+	var result = []
+
+	for row in src:
+		result.append(row.duplicate())
+
+	return result
