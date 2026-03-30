@@ -226,30 +226,38 @@ func update_tiles():
 
 func on_piece_placed(piece):
 
+	# 1. базові очки за блоки
 	var block_count = _count_blocks(piece.form)
 	add_score(block_count * 10)
 
+	# 2. видаляємо фігуру
 	piece.queue_free()
 
-	var cleared = clear_lines()  # 🔥 тепер повертає кількість
+	# 3. очищення ліній (АСИНХРОННО)
+	var cleared = await clear_lines()
 
+	# 4. нарахування бонусів
 	if cleared > 0:
 		_handle_clear_score(cleared)
 		combo += 1
 	else:
 		combo = 0
 
+	# 5. оновлюємо візуал поля
 	update_tiles()
 
+	# 6. даємо кадр, щоб сцена оновилась
 	await get_tree().process_frame
 
+	# 7. якщо всі фігури використані → спавнимо нові
 	if pieces_container.get_child_count() == 0:
 		_spawn_pieces()
-	elif _is_game_over():
+		return
+
+	# 8. перевірка game over
+	if _is_game_over():
 		game_over_ui.show_game_over()
 		get_tree().paused = true
-		
-
 
 func _is_game_over():
 
@@ -311,10 +319,12 @@ func clear_lines():
 	var rows = []
 	var cols = []
 
+	# шукаємо повні рядки
 	for y in range(GRID_H):
 		if grid[y].all(func(v): return v == 1):
 			rows.append(y)
 
+	# шукаємо повні колонки
 	for x in range(GRID_W):
 		var full = true
 		for y in range(GRID_H):
@@ -326,6 +336,36 @@ func clear_lines():
 
 	var total = rows.size() + cols.size()
 
+	if total == 0:
+		return 0
+	
+	if total > 0:
+		_shake_board(6 + total * 2, 0.15 + total * 0.03)
+	
+	
+
+	# 👉 анімація перед очищенням
+	var animated = []
+
+	for y in rows:
+		for x in range(GRID_W):
+			if grid[y][x] == 1:
+				var tile = _get_tile(x, y)
+				if tile:
+					tile.play_clear_animation()
+					animated.append(tile)
+
+	for x in cols:
+		for y in range(GRID_H):
+			if grid[y][x] == 1:
+				var tile = _get_tile(x, y)
+				if tile and tile not in animated:
+					tile.play_clear_animation()
+
+	# 👉 невелика пауза, щоб анімація встигла зіграти
+	await get_tree().create_timer(0.2).timeout
+
+	# 👉 тепер реально чистимо grid
 	for y in rows:
 		for x in range(GRID_W):
 			grid[y][x] = 0
@@ -336,6 +376,10 @@ func clear_lines():
 
 	return total
 
+
+func _get_tile(x, y):
+	var index = y * GRID_W + x
+	return get_child(index)
 
 # ================== SMART SNAP ==================
 
@@ -614,3 +658,19 @@ func _save_score():
 func _on_replay_btn_pressed() -> void:
 	get_tree().set_meta("replay", true)
 	get_tree().reload_current_scene()
+
+
+func _shake_board(intensity := 8.0, duration := 0.15):
+
+	var original_pos = board_container.position
+	var t = create_tween()
+
+	for i in range(5):
+		var offset = Vector2(
+			randf_range(-intensity, intensity),
+			randf_range(-intensity, intensity)
+		)
+
+		t.tween_property(board_container, "position", original_pos + offset, duration / 5)
+
+	t.tween_property(board_container, "position", original_pos, 0.05)
