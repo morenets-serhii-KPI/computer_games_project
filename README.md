@@ -1,4 +1,5 @@
 # Block Puzzle Game
+<img width="1061" height="166" alt="зображення" src="https://github.com/user-attachments/assets/6e1bb4a3-ef5e-404a-b94f-31fa17989bb8" />
 
 ## Overview
 Block Puzzle Game is a grid-based puzzle game developed using the Godot Engine. The player places randomly generated shapes on an 8×8 board to form complete rows or columns, which are then cleared to earn points. The game continues until no valid moves remain.
@@ -19,6 +20,8 @@ This project demonstrates core game development concepts including grid systems,
   - clearing lines
   - achieving combos
 - The game ends when **none of the available shapes can be placed**.
+
+  ![Gameplay Demo](Gameplay.gif)
 
 ---
 
@@ -91,34 +94,15 @@ The game ensures fairness by generating only those sets of shapes that can be pl
 ---
 
 ## Project Structure
-Main
-├── GameContainer
-│ ├── BoardContainer
-│ │ ├── Board (main game logic)
-│ │ ├── BoardBorder
-│ │ └── Background
-│ ├── RightPanel
-│ │ ├── PiecesContainer (active shapes)
-│ │ └── UI
-│ │ └── ScorePanel
-│ │ ├── BestRow
-│ │ └── CurrentRow
-│ └── Background
-├── StartUI
-│ ├── Title
-│ └── PlayBtn
-└── GameOverUI
-├── Dim
-└── Panel
-├── Title
-└── ReplayBtn
+<img width="543" height="1059" alt="зображення" src="https://github.com/user-attachments/assets/c68c199f-33f2-48ec-89bd-802d931dc203" />
+
 
 
 ---
 
 ## Scripts Overview
 
-### `board.gd`
+### [`board.gd`](scripts/board.gd)
 Main game controller:
 - grid management (8×8 array)
 - shape placement validation
@@ -130,7 +114,7 @@ Main game controller:
 
 ---
 
-### `piece.gd`
+### [`piece.gd`](scripts/piece.gd)
 Handles individual shape behavior:
 - drag & drop interaction
 - collision detection
@@ -139,14 +123,14 @@ Handles individual shape behavior:
 
 ---
 
-### `piece_block.gd`
+### [`piece_block.gd`](scripts/piece_block.gd)
 Represents a single block inside a shape:
 - visual representation
 - positioning inside shape
 
 ---
 
-### `shapes.gd`
+### [`shapes.gd`](scripts/shapes.gd)
 Defines all available shapes:
 - static data structure
 - includes rotations and variations
@@ -170,7 +154,7 @@ Defines all available shapes:
 ---
 
 ### Option 2: Export (if available)
-- Run the exported `.exe` file
+- Run the exported [`.exe`](Game.exe) file
 
 ---
 
@@ -195,7 +179,7 @@ Defines all available shapes:
 ---
 
 ## Author
-Serhii
+Morenets Serhii, Hryshchukova Dariia
 
 ---
 
